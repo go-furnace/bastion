@@ -156,7 +156,7 @@
                     "Fn::Base64" : { "Fn::Join" : [ "\n", [
                         "#!/bin/bash -v",
                         "sudo apt-get update",
-                        "sudo apt-get install ruby wget -y",
+                        "sudo apt-get install ruby wget awscli -y",
                         "sudo gem install aws-sdk-iam",
                         "cd /home/ubuntu/",
                         "wget https://aws-codedeploy-eu-central-1.s3.amazonaws.com/latest/install",
