@@ -1,0 +1,237 @@
+{
+    "Parameters": {
+        "InstanceType": {
+            "Description": "WebServer EC2 instance type",
+            "Type": "String",
+            "Default": "t2.nano"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Default": "UserKeyPair",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        }
+    },
+    "Mappings": {
+        "RegionMap": {
+            "eu-central-1": {
+                "ami": "ami-0bdf93799014acdc4"
+            }
+        }
+    },
+    "Resources": {
+        "VPC" : {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : "10.100.0.0/16",
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "FurnaceStack" }
+                ]
+            }
+        },
+        "InternetGateway" : {
+            "Type" : "AWS::EC2::InternetGateway"
+        },
+        "VPCGatewayAttachment" : {
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "InternetGatewayId" : { "Ref" : "InternetGateway" },
+                "VpcId" : { "Ref" : "VPC" }
+            }
+        },
+        "SubnetZone1" : {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "AvailabilityZone" : "eu-central-1a",
+                "CidrBlock" : "10.100.10.0/26",
+                "VpcId" : { "Ref" : "VPC" }
+            }
+        },
+        "RouteTable" : {
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPC" }
+            }
+        },
+        "Route" : {
+            "Type" : "AWS::EC2::Route",
+            "Properties" : {
+                "RouteTableId" : { "Ref" : "RouteTable" },
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : { "Ref" : "InternetGateway" }
+            }
+        },
+        "SubnetRouteTableAssociationZone1" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+            "RouteTableId" : { "Ref" : "RouteTable" },
+                "SubnetId" : { "Ref" : "SubnetZone1" }
+            }
+        },
+        "InstanceProfile" : {
+            "Type" : "AWS::IAM::InstanceProfile",
+            "Properties" : {
+                "Path" : "/",
+                "Roles" : [
+                    { "Ref" : "Role" }
+                ]
+            }
+        },
+        "Role" : {
+            "Type" : "AWS::IAM::Role",
+            "Properties" : {
+                "Path" : "/",
+                "AssumeRolePolicyDocument" : {
+                    "Version" : "2012-10-17",
+                    "Statement" : [
+                        {
+                            "Effect" : "Allow",
+                            "Principal" : {
+                                "Service" : [ "ec2.amazonaws.com" ]
+                            },
+                            "Action" : [ "sts:AssumeRole" ]
+                        }
+                    ]
+                }
+            }
+        },
+        "AutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "DependsOn" : [ "VPCGatewayAttachment" ],
+            "Properties": {
+                "AvailabilityZones": [
+                    "eu-central-1a"
+                ],
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfig"
+                },
+                "MinSize": "1",
+                "MaxSize": "1",
+                "HealthCheckGracePeriod" : "300",
+                "HealthCheckType" : "EC2",
+                "VPCZoneIdentifier" : [
+                    { "Ref" : "SubnetZone1" }
+                ],
+                "Tags" : [
+                    {
+                        "Key" : "fu_stage",
+                        "Value" : { "Ref": "AWS::StackName" },
+                        "PropagateAtLaunch" : true
+                    }
+                ]
+            },
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate": {
+                    "MinInstancesInService": "1",
+                    "MaxBatchSize": "1"
+                }
+            }
+        },
+        "LaunchConfig": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "AssociatePublicIpAddress" : true,
+                "IamInstanceProfile" : { "Ref" : "InstanceProfile" },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "ami"
+                    ]
+                },
+                "SecurityGroups": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "UserData" : {
+                    "Fn::Base64" : { "Fn::Join" : [ "\n", [
+                        "#!/bin/bash -v",
+                        "sudo apt-get update",
+                        "sudo apt-get install ruby wget -y",
+                        "sudo gem install aws-sdk-iam",
+                        "cd /home/ubuntu/",
+                        "wget https://aws-codedeploy-eu-central-1.s3.amazonaws.com/latest/install",
+                        "chmod +x ./install",
+                        "sudo ./install auto",
+                        "sudo service codedeploy-agent start",
+                        "sudo apt-get install httpd -y",
+                        "echo '<html><body>healthy</body></html>' >> /var/www/html/healthy.html",
+                        "sudo service httpd start",
+                        "sudo cd /etc/ssh/",
+                        "sudo wget https://s3.eu-central-1.amazonaws.com/devops-meetup-bucket/authorized_keys.rb",
+                        "sudo chmod 0555 authorized_keys.rb",
+                        "sudo cat \"AuthorizedKeysCommand /etc/ssh/authorized_keys.rb\nAuthorizedKeysCommandUser root\" >> /etc/ssh/sshd_config",
+                        "sudo systemctl restart sshd.service"
+                    ] ] }
+                }
+            }
+        },
+        "SecurityGroupSource": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId" : { "Ref" : "VPC" },
+                "GroupDescription": "SecurityGroupSource",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "SecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "GroupDescription" : "SecurityGroup",
+                "SecurityGroupIngress" : [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : "80",
+                        "ToPort" : "80",
+                        "SourceSecurityGroupId" : { "Ref" : "SecurityGroupSource" }
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : "443",
+                        "ToPort" : "443",
+                        "SourceSecurityGroupId" : { "Ref" : "SecurityGroupSource" }
+                    }
+                ],
+                "SecurityGroupEgress" : [
+                    {
+                        "IpProtocol" : "-1",
+                        "FromPort" : "-1",
+                        "ToPort" : "-1",
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "URL": {
+            "Description": "URL of the website",
+            "Value": {
+                "Fn::Join": [
+                    ":",
+                    [
+                        { "Ref" : "AWS::StackName" },
+                        "AccountVPC"
+                    ]
+                ]
+            }
+        }
+    }
+}

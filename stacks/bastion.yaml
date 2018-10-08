@@ -1,0 +1,10 @@
+main:
+  stackname: Bastion
+  spinner: 1
+  plugins:
+    plugin_path: "./plugins"
+aws:
+  code_deploy_role: CodeDeployServiceRole
+  region: us-east-1
+  template_name: bastion.template
+  app_name: bastion
