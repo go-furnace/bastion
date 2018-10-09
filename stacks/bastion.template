@@ -20,84 +20,137 @@
         }
     },
     "Resources": {
-        "VPC" : {
-            "Type" : "AWS::EC2::VPC",
-            "Properties" : {
-                "CidrBlock" : "10.100.0.0/16",
-                "Tags" : [
-                    { "Key" : "Name", "Value" : "FurnaceStack" }
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.100.0.0/16",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "FurnaceStack"
+                    }
                 ]
             }
         },
-        "InternetGateway" : {
-            "Type" : "AWS::EC2::InternetGateway"
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway"
         },
-        "VPCGatewayAttachment" : {
-            "Type" : "AWS::EC2::VPCGatewayAttachment",
-            "Properties" : {
-                "InternetGatewayId" : { "Ref" : "InternetGateway" },
-                "VpcId" : { "Ref" : "VPC" }
+        "VPCGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                },
+                "VpcId": {
+                    "Ref": "VPC"
+                }
             }
         },
-        "SubnetZone1" : {
-            "Type" : "AWS::EC2::Subnet",
-            "Properties" : {
-                "AvailabilityZone" : "eu-central-1a",
-                "CidrBlock" : "10.100.10.0/26",
-                "VpcId" : { "Ref" : "VPC" }
+        "SubnetZone1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": "eu-central-1a",
+                "CidrBlock": "10.100.10.0/26",
+                "VpcId": {
+                    "Ref": "VPC"
+                }
             }
         },
-        "RouteTable" : {
-            "Type" : "AWS::EC2::RouteTable",
-            "Properties" : {
-                "VpcId" : { "Ref" : "VPC" }
+        "RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                }
             }
         },
-        "Route" : {
-            "Type" : "AWS::EC2::Route",
-            "Properties" : {
-                "RouteTableId" : { "Ref" : "RouteTable" },
-                "DestinationCidrBlock" : "0.0.0.0/0",
-                "GatewayId" : { "Ref" : "InternetGateway" }
+        "Route": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
             }
         },
-        "SubnetRouteTableAssociationZone1" : {
-            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
-            "Properties" : {
-            "RouteTableId" : { "Ref" : "RouteTable" },
-                "SubnetId" : { "Ref" : "SubnetZone1" }
+        "SubnetRouteTableAssociationZone1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetZone1"
+                }
             }
         },
-        "InstanceProfile" : {
-            "Type" : "AWS::IAM::InstanceProfile",
-            "Properties" : {
-                "Path" : "/",
-                "Roles" : [
-                    { "Ref" : "Role" }
+        "InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "AssumeRole"
+                    }
                 ]
             }
         },
-        "Role" : {
-            "Type" : "AWS::IAM::Role",
-            "Properties" : {
-                "Path" : "/",
-                "AssumeRolePolicyDocument" : {
-                    "Version" : "2012-10-17",
-                    "Statement" : [
+        "AssumeRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "Path": "/",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
                         {
-                            "Effect" : "Allow",
-                            "Principal" : {
-                                "Service" : [ "ec2.amazonaws.com" ]
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
                             },
-                            "Action" : [ "sts:AssumeRole" ]
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
                         }
                     ]
                 }
             }
         },
+        "GetSSHKeysPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "GetSSHKeys",
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "iam:DeleteSSHPublicKey",
+                                "iam:GetSSHPublicKey",
+                                "iam:ListSSHPublicKeys",
+                                "iam:UpdateSSHPublicKey",
+                                "iam:UploadSSHPublicKey"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "AssumeRole"
+                    }
+                ]
+            }
+        },
         "AutoScalingGroup": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
-            "DependsOn" : [ "VPCGatewayAttachment" ],
+            "DependsOn": [
+                "VPCGatewayAttachment"
+            ],
             "Properties": {
                 "AvailabilityZones": [
                     "eu-central-1a"
@@ -107,16 +160,20 @@
                 },
                 "MinSize": "1",
                 "MaxSize": "1",
-                "HealthCheckGracePeriod" : "300",
-                "HealthCheckType" : "EC2",
-                "VPCZoneIdentifier" : [
-                    { "Ref" : "SubnetZone1" }
-                ],
-                "Tags" : [
+                "HealthCheckGracePeriod": "300",
+                "HealthCheckType": "EC2",
+                "VPCZoneIdentifier": [
                     {
-                        "Key" : "fu_stage",
-                        "Value" : { "Ref": "AWS::StackName" },
-                        "PropagateAtLaunch" : true
+                        "Ref": "SubnetZone1"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "fu_stage",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        },
+                        "PropagateAtLaunch": true
                     }
                 ]
             },
@@ -130,8 +187,10 @@
         "LaunchConfig": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
-                "AssociatePublicIpAddress" : true,
-                "IamInstanceProfile" : { "Ref" : "InstanceProfile" },
+                "AssociatePublicIpAddress": true,
+                "IamInstanceProfile": {
+                    "Ref": "InstanceProfile"
+                },
                 "KeyName": {
                     "Ref": "KeyName"
                 },
@@ -152,33 +211,37 @@
                 "InstanceType": {
                     "Ref": "InstanceType"
                 },
-                "UserData" : {
-                    "Fn::Base64" : { "Fn::Join" : [ "\n", [
-                        "#!/bin/bash -v",
-                        "sudo apt-get update",
-                        "sudo apt-get install ruby wget awscli -y",
-                        "sudo gem install aws-sdk-iam",
-                        "cd /home/ubuntu/",
-                        "wget https://aws-codedeploy-eu-central-1.s3.amazonaws.com/latest/install",
-                        "chmod +x ./install",
-                        "sudo ./install auto",
-                        "sudo service codedeploy-agent start",
-                        "sudo apt-get install httpd -y",
-                        "echo '<html><body>healthy</body></html>' >> /var/www/html/healthy.html",
-                        "sudo service httpd start",
-                        "sudo cd /etc/ssh/",
-                        "sudo wget https://s3.eu-central-1.amazonaws.com/devops-meetup-bucket/authorized_keys.rb",
-                        "sudo chmod 0555 authorized_keys.rb",
-                        "sudo cat \"AuthorizedKeysCommand /etc/ssh/authorized_keys.rb\nAuthorizedKeysCommandUser root\" >> /etc/ssh/sshd_config",
-                        "sudo systemctl restart sshd.service"
-                    ] ] }
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "#!/bin/bash -v",
+                                "sudo apt-get update",
+                                "sudo apt-get install ruby wget awscli jq -y",
+                                "sudo gem install aws-sdk-iam",
+                                "cd /home/ubuntu/",
+                                "wget https://aws-codedeploy-eu-central-1.s3.amazonaws.com/latest/install",
+                                "chmod +x ./install",
+                                "sudo ./install auto",
+                                "sudo service codedeploy-agent start",
+                                "sudo apt-get install httpd -y",
+                                "echo '<html><body>healthy</body></html>' >> /var/www/html/healthy.html",
+                                "sudo service httpd start",
+                                "cd /etc/ssh/ && sudo wget https://s3.eu-central-1.amazonaws.com/devops-meetup-bucket/authorized_keys.rb",
+                                "sudo chmod 0555 /etc/ssh/authorized_keys.rb"
+                            ]
+                        ]
+                    }
                 }
             }
         },
         "SecurityGroupSource": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "VpcId" : { "Ref" : "VPC" },
+                "VpcId": {
+                    "Ref": "VPC"
+                },
                 "GroupDescription": "SecurityGroupSource",
                 "SecurityGroupIngress": [
                     {
@@ -190,31 +253,43 @@
                 ]
             }
         },
-        "SecurityGroup" : {
-            "Type" : "AWS::EC2::SecurityGroup",
-            "Properties" : {
-                "VpcId" : { "Ref" : "VPC" },
-                "GroupDescription" : "SecurityGroup",
-                "SecurityGroupIngress" : [
+        "SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "GroupDescription": "SecurityGroup",
+                "SecurityGroupIngress": [
                     {
-                        "IpProtocol" : "tcp",
-                        "FromPort" : "80",
-                        "ToPort" : "80",
-                        "SourceSecurityGroupId" : { "Ref" : "SecurityGroupSource" }
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "SourceSecurityGroupId": {
+                            "Ref": "SecurityGroupSource"
+                        }
                     },
                     {
-                        "IpProtocol" : "tcp",
-                        "FromPort" : "443",
-                        "ToPort" : "443",
-                        "SourceSecurityGroupId" : { "Ref" : "SecurityGroupSource" }
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "SourceSecurityGroupId": {
+                            "Ref": "SecurityGroupSource"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": "0.0.0.0/0"
                     }
                 ],
-                "SecurityGroupEgress" : [
+                "SecurityGroupEgress": [
                     {
-                        "IpProtocol" : "-1",
-                        "FromPort" : "-1",
-                        "ToPort" : "-1",
-                        "CidrIp" : "0.0.0.0/0"
+                        "IpProtocol": "-1",
+                        "FromPort": "-1",
+                        "ToPort": "-1",
+                        "CidrIp": "0.0.0.0/0"
                     }
                 ]
             }
@@ -227,7 +302,9 @@
                 "Fn::Join": [
                     ":",
                     [
-                        { "Ref" : "AWS::StackName" },
+                        {
+                            "Ref": "AWS::StackName"
+                        },
                         "AccountVPC"
                     ]
                 ]
