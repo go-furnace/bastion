@@ -40,7 +40,7 @@ cat creds.json | jq .SecretAccessKey
 cat creds.json | jq .AccessKeyId
 ```
 
-# Usage
+# Usage
 
 Edit the `sshd_config` file to look like this:
 
